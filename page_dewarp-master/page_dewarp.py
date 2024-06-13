@@ -812,7 +812,10 @@ def main():
 
         imgfile = os.path.abspath(__file__).replace('page_dewarp.py','input').replace('\\','/') +'/'+ imgfile
 
+        print(imgfile)
+
         img = cv2.imread(imgfile)
+        os.remove(imgfile)
         small = resize_to_screen(img)
         basename = os.path.basename(imgfile)
         name, _ = os.path.splitext(basename)
@@ -857,7 +860,7 @@ def main():
 
         outfiles.append(outfile)
 
-        os.remove(imgfile)
+        
 
 if __name__ == '__main__':
     main()
