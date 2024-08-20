@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Environment
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -17,6 +16,9 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import android.os.Build
+import android.view.View
+import android.view.WindowManager
 
 class MainActivity : AppCompatActivity() {
 
@@ -34,9 +36,31 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         settingButton()
 
+        fun setStatusBarColor(colorResId: Int) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                window.statusBarColor = ContextCompat.getColor(this, colorResId)
+            }
+        }
+
+        fun setStatusBarIconColor(isDark: Boolean) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val decor = window.decorView
+                if (isDark) {
+                    decor.systemUiVisibility = decor.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+                } else {
+                    decor.systemUiVisibility = decor.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                }
+            }
+        }
+
+        setStatusBarColor(R.color.black)
+
+        // 상태바 아이콘 색상 설정
+        setStatusBarIconColor(isDark = true)
 
         statusTextView = findViewById(R.id.statusTextView)
         val downloadButton: Button = findViewById(R.id.button)
+        val scanButton: Button = findViewById(R.id.scanButton)
 
         // 권한 요청
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -46,15 +70,22 @@ class MainActivity : AppCompatActivity() {
 
         downloadButton.setOnClickListener {
             CoroutineScope(Dispatchers.Main).launch {
-                val result = downloadAndSaveFile("http://192.168.137.24:5000/download_folder", "file.pdf", "Documents")
+                val result = downloadAndSaveFile("http://192.168.137.89:5000/download_folder", "file.pdf", "Documents")
                 statusTextView.text = result
             }
         }
+
+        scanButton.setOnClickListener {
+            val intent = Intent(this, ScanActivity::class.java)
+            startActivity(intent)
+        }
     }
-    fun settingButton(){
+
+    fun settingButton() {
         val button = findViewById<Button>(R.id.GoToPDF)
-        button.setOnClickListener{
+        button.setOnClickListener {
             val intent = Intent(this, SubActivity::class.java)
+            intent.putExtra("AUTO_LAUNCH_PDF_LIST", true)  // 플래그 추가
             startActivity(intent)
         }
     }
@@ -80,13 +111,18 @@ class MainActivity : AppCompatActivity() {
 
                     val body = response.body ?: throw IOException("Empty response body")
 
-//                    val directory = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), directoryName)
-                    val directory = File("/storage/emulated/0/Documents/Documents")
+                    val directory = File("/storage/emulated/0/Documents/MDP/")
                     if (!directory.exists()) {
                         directory.mkdirs()
                     }
 
-                    val file = File(directory, fileName)
+                    var file = File(directory, fileName)
+                    var counter = 1
+                    while (file.exists()) {
+                        val newFileName = "file${counter++}.pdf"
+                        file = File(directory, newFileName)
+                    }
+
                     FileOutputStream(file).use { fos ->
                         body.byteStream().use { input ->
                             val buffer = ByteArray(8192)
@@ -97,14 +133,12 @@ class MainActivity : AppCompatActivity() {
                             fos.flush()
                         }
                     }
-
-                    "Download completed. File saved to: ${file.absolutePath}"
+                    "success"
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                "Error: ${e.message}"
+                "fail"
             }
         }
     }
 }
-
