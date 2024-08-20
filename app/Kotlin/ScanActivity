@@ -1,0 +1,117 @@
+package com.example.mdpproject
+
+import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+
+class ScanActivity : AppCompatActivity() {
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+
+    private lateinit var pageCountEditText: EditText
+    private lateinit var statusTextView: TextView
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_scan)
+
+        fun setStatusBarColor(colorResId: Int) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                window.statusBarColor = ContextCompat.getColor(this, colorResId)
+            }
+        }
+
+        fun setStatusBarIconColor(isDark: Boolean) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val decor = window.decorView
+                if (isDark) {
+                    decor.systemUiVisibility = decor.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+                } else {
+                    decor.systemUiVisibility = decor.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                }
+            }
+        }
+
+        setStatusBarColor(R.color.black)
+        setStatusBarIconColor(isDark = true)
+
+        pageCountEditText = findViewById(R.id.pageCountEditText)
+        statusTextView = findViewById(R.id.statusTextView)
+
+        findViewById<Button>(R.id.startScanButton).setOnClickListener {
+            val pageCount = pageCountEditText.text.toString()
+            if (pageCount.isNotEmpty()) {   
+                CoroutineScope(Dispatchers.Main).launch {
+                    val result = sendCommandToRaspberryPi("start_scan", pageCount)
+                    statusTextView.text = result
+                }
+            }
+        }
+
+        findViewById<Button>(R.id.pauseScanButton).setOnClickListener {
+            CoroutineScope(Dispatchers.Main).launch {
+                val result = sendCommandToRaspberryPi("stop", "")
+                statusTextView.text = result
+            }
+        }
+
+        findViewById<Button>(R.id.endScanButton).setOnClickListener {
+            CoroutineScope(Dispatchers.Main).launch {
+                val result = sendCommandToRaspberryPi("reset", "")
+                statusTextView.text = result
+            }
+        }
+
+        findViewById<Button>(R.id.goBackButton).setOnClickListener {
+            val intent = Intent(this, MainActivity::class.java)
+            startActivity(intent)
+            finish()
+        }
+
+        findViewById<Button>(R.id.endserver).setOnClickListener {
+            CoroutineScope(Dispatchers.Main).launch {
+                val result = sendCommandToRaspberryPi("shutdown", "")
+                statusTextView.text = result
+            }
+        }
+    }
+
+    private suspend fun sendCommandToRaspberryPi(command: String, pageCount: String): String {
+        return withContext(Dispatchers.IO) {
+            val url = when (command) {
+                "start_scan" -> "http://192.168.137.89:5000/$command/$pageCount"
+                "shutdown" -> "http://192.168.137.89:5000/$command"
+                else -> "http://192.168.137.89:5000/$command"
+            }
+            val request = Request.Builder().url(url).build()
+
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        throw IOException("Unexpected code $response")
+                    }
+                    "Command $command sent successfully."
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                "Error: ${e.message}"
+            }
+        }
+    }
+}
