@@ -51,12 +51,3 @@ fun PdfViewer(
         }
     }
 }
-
-//@Composable
-//fun PdfPageImage(pdfRenderer: PdfRenderer, pageIndex: Int): Bitmap {
-//    val page = pdfRenderer.openPage(pageIndex)
-//    val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-//    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-//    page.close()
-//    return bitmap
-//}
